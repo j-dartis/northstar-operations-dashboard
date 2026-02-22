@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NorthStar Operations Performance Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #07090f;
+    --surface: #0e1219;
+    --surface2: #141925;
+    --border: #1e2535;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --accent3: #a855f7;
+    --green: #22d3a5;
+    --red: #ff4757;
+    --yellow: #fbbf24;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --glow: rgba(0, 212, 255, 0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Ambient glow */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 400px;
+    background: radial-gradient(ellipse, rgba(0,212,255,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 32px 28px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 36px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    animation: fadeDown 0.6s ease both;
+  }
+
+  .header-left {}
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    opacity: 0.8;
+  }
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    letter-spacing: 0.05em;
+    line-height: 1;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .header-right {
+    text-align: right;
+  }
+  .date-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+  .status-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--green);
+    margin-top: 4px;
+  }
+  .status-dot::before {
+    content: '';
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  /* ── KPI CARDS ── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+    animation: fadeUp 0.5s 0.1s ease both;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+    cursor: default;
+  }
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--accent);
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .kpi-card.blue::before { background: linear-gradient(90deg, var(--accent), transparent); }
+  .kpi-card.orange::before { background: linear-gradient(90deg, var(--accent2), transparent); }
+  .kpi-card.purple::before { background: linear-gradient(90deg, var(--accent3), transparent); }
+
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    opacity: 0.04;
+  }
+  .kpi-card.blue::after { background: var(--accent); transform: translate(30%, -30%); }
+  .kpi-card.orange::after { background: var(--accent2); transform: translate(30%, -30%); }
+  .kpi-card.purple::after { background: var(--accent3); transform: translate(30%, -30%); }
+
+  .kpi-label {
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    margin-bottom: 10px;
+  }
+  .kpi-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.8rem;
+    letter-spacing: 0.03em;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .kpi-card.blue .kpi-value { color: var(--accent); }
+  .kpi-card.orange .kpi-value { color: var(--accent2); }
+  .kpi-card.purple .kpi-value { color: var(--accent3); }
+
+  .kpi-change {
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .kpi-change.up { color: var(--green); }
+  .kpi-change.down { color: var(--red); }
+
+  /* ── CHARTS GRID ── */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+    animation: fadeUp 0.5s 0.2s ease both;
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+  .chart-card:hover { border-color: rgba(0,212,255,0.3); }
+
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+  .chart-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  .chart-subtitle {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .chart-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .chart-wrap {
+    position: relative;
+    height: 240px;
+  }
+
+  /* Bottom row: donut + table */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.6fr;
+    gap: 16px;
+    animation: fadeUp 0.5s 0.3s ease both;
+  }
+
+  /* Donut legend */
+  .donut-wrap {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    height: 240px;
+  }
+  .donut-canvas-wrap {
+    flex: 0 0 180px;
+    height: 180px;
+    position: relative;
+  }
+  .donut-center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .donut-center-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.6rem;
+    color: var(--text);
+    line-height: 1;
+  }
+  .donut-center-lbl {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .legend {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .legend-name { color: var(--muted); flex: 1; }
+  .legend-val { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text); }
+  .legend-pct { font-size: 10px; color: var(--muted); margin-left: 4px; }
+
+  /* Insights table */
+  .insights-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .insights-table th {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 0 12px 12px 0;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .insights-table td {
+    padding: 10px 12px 10px 0;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(30,37,53,0.6);
+  }
+  .insights-table tr:last-child td { border-bottom: none; }
+
+  .bar-cell { width: 120px; }
+  .mini-bar-bg {
+    height: 4px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .mini-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s ease;
+  }
+
+  .var-positive { color: var(--green); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .var-negative { color: var(--red); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+  /* ── FOOTER ── */
+  footer {
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    animation: fadeUp 0.5s 0.4s ease both;
+  }
+  .footer-left {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .footer-tag {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .footer-tag span {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Counter animation */
+  .count-up { display: inline-block; }
+
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: 1fr 1fr; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .bottom-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .kpi-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-left">
+      <div class="eyebrow">■ Executive Intelligence Report</div>
+      <h1>NorthStar Operations</h1>
+    </div>
+    <div class="header-right">
+      <div class="date-badge">FY2026 · JAN 01 – JAN 31</div>
+      <div class="status-dot">Live Dashboard</div>
+    </div>
+  </header>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-row">
+    <div class="kpi-card blue">
+      <div class="kpi-label">Total Revenue</div>
+      <div class="kpi-value" id="rev">$0</div>
+      <div class="kpi-change up">▲ 12.4% vs prior month</div>
+    </div>
+    <div class="kpi-card orange">
+      <div class="kpi-label">Gross Margin</div>
+      <div class="kpi-value" id="margin">$0</div>
+      <div class="kpi-change up">▲ 8.7% vs prior month</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Margin %</div>
+      <div class="kpi-value" id="marginpct">0%</div>
+      <div class="kpi-change down">▼ 1.2pp vs target</div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts-grid">
+    <!-- Profit by Product -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Profit by Product</div>
+          <div class="chart-subtitle">Margin contribution per SKU</div>
+        </div>
+        <div class="chart-badge">JAN 2026</div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="profitChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Budget Variance by Location -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Budget Variance by Location</div>
+          <div class="chart-subtitle">Actual vs. budgeted performance</div>
+        </div>
+        <div class="chart-badge">Δ VARIANCE</div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="varianceChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM ROW -->
+  <div class="bottom-grid">
+    <!-- Cost Breakdown Donut -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Cost Breakdown</div>
+          <div class="chart-subtitle">By cost category</div>
+        </div>
+        <div class="chart-badge">OPEX</div>
+      </div>
+      <div class="donut-wrap">
+        <div class="donut-canvas-wrap">
+          <canvas id="donutChart"></canvas>
+          <div class="donut-center">
+            <div class="donut-center-val">$8.2M</div>
+            <div class="donut-center-lbl">Total Cost</div>
+          </div>
+        </div>
+        <div class="legend" id="donutLegend"></div>
+      </div>
+    </div>
+
+    <!-- Location Performance Table -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Location Performance</div>
+          <div class="chart-subtitle">Revenue, margin & variance at a glance</div>
+        </div>
+        <div class="chart-badge">5 REGIONS</div>
+      </div>
+      <table class="insights-table">
+        <thead>
+          <tr>
+            <th>Location</th>
+            <th>Revenue</th>
+            <th>Margin</th>
+            <th>vs Budget</th>
+            <th class="bar-cell">Attainment</th>
+          </tr>
+        </thead>
+        <tbody id="locationTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-left">NORTHSTAR_OPS · v2.1 · POWERED BY POWER BI + HTML5</div>
+    <div class="footer-tag">Built with <span>Power BI</span> · Designed for Executive Reporting</div>
+  </footer>
+
+</div>
+
+<script>
+// ── DATA ──
+const products = ['Apex Pro', 'Delta Core', 'Vertex X', 'Nomad Plus', 'Zenith Lite'];
+const productProfit = [1240000, 980000, 1560000, 720000, 430000];
+
+const locations = ['Northeast', 'Southeast', 'Midwest', 'Southwest', 'Northwest'];
+const budgetVariance = [142000, -38000, 265000, -91000, 188000];
+
+const costCategories = ['Labor', 'Materials', 'Logistics', 'Overhead', 'Marketing'];
+const costAmounts = [3100000, 2200000, 1300000, 900000, 700000];
+const costColors = ['#00d4ff', '#a855f7', '#ff6b35', '#22d3a5', '#fbbf24'];
+
+const locationData = [
+  { name: 'Northeast', revenue: 3200000, margin: 38, variance: 142000, attain: 92 },
+  { name: 'Southeast', revenue: 2800000, margin: 34, variance: -38000, attain: 78 },
+  { name: 'Midwest',   revenue: 3600000, margin: 41, variance: 265000, attain: 96 },
+  { name: 'Southwest', revenue: 2400000, margin: 31, variance: -91000, attain: 71 },
+  { name: 'Northwest', revenue: 2900000, margin: 36, variance: 188000, attain: 88 },
+];
+
+// ── COUNT-UP ANIMATION ──
+function animateCount(el, target, prefix, suffix, decimals=0, duration=1400) {
+  const start = performance.now();
+  const step = (now) => {
+    const t = Math.min((now - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    const val = target * ease;
+    if (decimals === 0) {
+      el.textContent = prefix + (val >= 1e6
+        ? (val/1e6).toFixed(1) + 'M'
+        : val >= 1e3
+          ? (val/1e3).toFixed(0) + 'K'
+          : Math.round(val)) + suffix;
+    } else {
+      el.textContent = prefix + val.toFixed(decimals) + suffix;
+    }
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    animateCount(document.getElementById('rev'), 14900000, '$', '', 0, 1600);
+    animateCount(document.getElementById('margin'), 5200000, '$', '', 0, 1600);
+    animateCount(document.getElementById('marginpct'), 34.9, '', '%', 1, 1600);
+  }, 300);
+});
+
+// ── CHART DEFAULTS ──
+Chart.defaults.color = '#64748b';
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+Chart.defaults.font.size = 11;
+
+const gridColor = 'rgba(30,37,53,0.8)';
+
+// ── PROFIT BY PRODUCT ──
+new Chart(document.getElementById('profitChart'), {
+  type: 'bar',
+  data: {
+    labels: products,
+    datasets: [{
+      data: productProfit,
+      backgroundColor: [
+        'rgba(0,212,255,0.85)',
+        'rgba(0,212,255,0.65)',
+        'rgba(0,212,255,1)',
+        'rgba(0,212,255,0.5)',
+        'rgba(0,212,255,0.4)',
+      ],
+      borderRadius: 6,
+      borderSkipped: false,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0e1219',
+        borderColor: '#1e2535',
+        borderWidth: 1,
+        callbacks: {
+          label: ctx => ' $' + (ctx.raw/1e6).toFixed(2) + 'M profit'
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: gridColor }, ticks: { color: '#64748b' } },
+      y: {
+        grid: { color: gridColor },
+        ticks: {
+          color: '#64748b',
+          callback: v => '$' + (v/1e6).toFixed(1) + 'M'
+        }
+      }
+    }
+  }
+});
+
+// ── VARIANCE BY LOCATION ──
+const varColors = budgetVariance.map(v =>
+  v >= 0 ? 'rgba(34,211,165,0.85)' : 'rgba(255,71,87,0.8)'
+);
+new Chart(document.getElementById('varianceChart'), {
+  type: 'bar',
+  data: {
+    labels: locations,
+    datasets: [{
+      label: 'Budget Variance',
+      data: budgetVariance,
+      backgroundColor: varColors,
+      borderRadius: 6,
+      borderSkipped: false,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0e1219',
+        borderColor: '#1e2535',
+        borderWidth: 1,
+        callbacks: {
+          label: ctx => (ctx.raw >= 0 ? ' +$' : ' -$') + Math.abs(ctx.raw/1e3).toFixed(0) + 'K vs budget'
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: gridColor }, ticks: { color: '#64748b' } },
+      y: {
+        grid: { color: gridColor },
+        ticks: {
+          color: '#64748b',
+          callback: v => (v >= 0 ? '+' : '') + '$' + (v/1e3).toFixed(0) + 'K'
+        }
+      }
+    }
+  }
+});
+
+// ── DONUT CHART ──
+new Chart(document.getElementById('donutChart'), {
+  type: 'doughnut',
+  data: {
+    labels: costCategories,
+    datasets: [{
+      data: costAmounts,
+      backgroundColor: costColors.map(c => c + 'dd'),
+      borderColor: '#07090f',
+      borderWidth: 3,
+      hoverOffset: 6,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '68%',
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0e1219',
+        borderColor: '#1e2535',
+        borderWidth: 1,
+        callbacks: {
+          label: ctx => ' $' + (ctx.raw/1e6).toFixed(1) + 'M'
+        }
+      }
+    }
+  }
+});
+
+// Build donut legend
+const total = costAmounts.reduce((a,b) => a+b, 0);
+const legendEl = document.getElementById('donutLegend');
+costCategories.forEach((cat, i) => {
+  const pct = ((costAmounts[i]/total)*100).toFixed(0);
+  legendEl.innerHTML += `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${costColors[i]}"></div>
+      <span class="legend-name">${cat}</span>
+      <span class="legend-val">$${(costAmounts[i]/1e6).toFixed(1)}M</span>
+      <span class="legend-pct">${pct}%</span>
+    </div>`;
+});
+
+// ── LOCATION TABLE ──
+const tableBody = document.getElementById('locationTable');
+const maxRev = Math.max(...locationData.map(d => d.revenue));
+locationData.forEach(d => {
+  const pct = (d.revenue / maxRev * 100).toFixed(0);
+  const varClass = d.variance >= 0 ? 'var-positive' : 'var-negative';
+  const varStr = (d.variance >= 0 ? '+' : '') + '$' + (Math.abs(d.variance)/1e3).toFixed(0) + 'K';
+  const barColor = d.attain >= 90 ? '#22d3a5' : d.attain >= 75 ? '#fbbf24' : '#ff4757';
+
+  tableBody.innerHTML += `
+    <tr>
+      <td>${d.name}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:12px;">$${(d.revenue/1e6).toFixed(1)}M</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:12px;">${d.margin}%</td>
+      <td class="${varClass}">${varStr}</td>
+      <td class="bar-cell">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div class="mini-bar-bg" style="flex:1;">
+            <div class="mini-bar-fill" style="width:${d.attain}%;background:${barColor};"></div>
+          </div>
+          <span style="font-size:10px;color:${barColor};font-family:'JetBrains Mono',monospace;">${d.attain}%</span>
+        </div>
+      </td>
+    </tr>`;
+});
+</script>
+</body>
+</html>
